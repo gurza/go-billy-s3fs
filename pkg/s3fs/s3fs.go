@@ -91,9 +91,9 @@ func (s *S3FS) Rename(oldpath string, newpath string) error {
 	panic("unimplemented")
 }
 
-// Root implements billy.Filesystem.
+// Root returns the root path of the filesystem.
 func (s *S3FS) Root() string {
-	panic("unimplemented")
+	return s.root
 }
 
 // Stat implements billy.Filesystem.
