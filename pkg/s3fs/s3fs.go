@@ -1,21 +1,43 @@
 package s3fs
 
 import (
+	"fmt"
 	"io/fs"
 	"path"
+	"strings"
 
 	"github.com/go-git/go-billy/v5"
 )
 
-type S3FS struct{}
+type S3FS struct {
+	root string
+}
 
 func NewS3FS() (billy.Filesystem, error) {
 	return &S3FS{}, nil
 }
 
-// Chroot implements billy.Filesystem.
-func (s *S3FS) Chroot(path string) (billy.Filesystem, error) {
-	panic("unimplemented")
+// Chroot creates a new filesystem rooted at newRoot within the current root.
+func (s *S3FS) Chroot(newRoot string) (billy.Filesystem, error) {
+	cleanRoot := path.Clean(newRoot)
+
+	// Ensure the path is relative
+	if path.IsAbs(cleanRoot) {
+		cleanRoot = cleanRoot[1:]
+	}
+
+	newPath := path.Join(s.root, cleanRoot)
+
+	// Ensure the new root path does not escape the current root
+	base := path.Clean(s.root) + "/"
+	target := path.Clean(newPath) + "/"
+	if !strings.HasPrefix(target, base) {
+		return nil, fmt.Errorf("invalid path: %s escapes from root", newRoot)
+	}
+
+	return &S3FS{
+		root: newPath,
+	}, nil
 }
 
 // Create implements billy.Filesystem.
