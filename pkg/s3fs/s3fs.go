@@ -2,6 +2,7 @@ package s3fs
 
 import (
 	"io/fs"
+	"path"
 
 	"github.com/go-git/go-billy/v5"
 )
@@ -22,9 +23,10 @@ func (s *S3FS) Create(filename string) (billy.File, error) {
 	panic("unimplemented")
 }
 
-// Join implements billy.Filesystem.
+// Join combines any number of path elements into a single path,
+// adding a separator if necessary.
 func (s *S3FS) Join(elem ...string) string {
-	panic("unimplemented")
+	return path.Join(elem...)
 }
 
 // Lstat implements billy.Filesystem.
