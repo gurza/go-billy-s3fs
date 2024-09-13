@@ -75,11 +75,6 @@ func (s *S3FS) Lstat(filename string) (fs.FileInfo, error) {
 	panic("unimplemented")
 }
 
-// MkdirAll implements billy.Filesystem.
-func (s *S3FS) MkdirAll(filename string, perm fs.FileMode) error {
-	panic("unimplemented")
-}
-
 // Open implements billy.Filesystem.
 func (s *S3FS) Open(filename string) (billy.File, error) {
 	panic("unimplemented")
@@ -149,6 +144,12 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	}
 
 	return results, nil
+}
+
+// MkdirAll creates a directory and all necessary parent directories
+// in the S3 bucket with the specified permissions.
+func (s *S3FS) MkdirAll(path string, perm fs.FileMode) error {
+	return ErrNotImplemented
 }
 
 // Readlink implements billy.Filesystem.
