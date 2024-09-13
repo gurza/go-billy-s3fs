@@ -70,11 +70,6 @@ func (s *S3FS) Join(elem ...string) string {
 	return path.Join(elem...)
 }
 
-// Lstat implements billy.Filesystem.
-func (s *S3FS) Lstat(filename string) (fs.FileInfo, error) {
-	panic("unimplemented")
-}
-
 // Open implements billy.Filesystem.
 func (s *S3FS) Open(filename string) (billy.File, error) {
 	panic("unimplemented")
@@ -152,9 +147,20 @@ func (s *S3FS) MkdirAll(path string, perm fs.FileMode) error {
 	return ErrNotImplemented
 }
 
-// Readlink implements billy.Filesystem.
-func (s *S3FS) Readlink(link string) (string, error) {
+// Lstat implements billy.Filesystem.
+func (s *S3FS) Lstat(name string) (fs.FileInfo, error) {
 	panic("unimplemented")
+}
+
+// Symlink creates newname as a symbolic link to oldname in the S3 bucket.
+func (s *S3FS) Symlink(oldname string, newname string) error {
+	return ErrNotImplemented
+}
+
+// Readlink returns the destination of the named symbolic link
+// in the S3 bucket.
+func (s *S3FS) Readlink(name string) (string, error) {
+	return "", ErrNotImplemented
 }
 
 // Remove implements billy.Filesystem.
@@ -174,11 +180,6 @@ func (s *S3FS) Root() string {
 
 // Stat implements billy.Filesystem.
 func (s *S3FS) Stat(filename string) (fs.FileInfo, error) {
-	panic("unimplemented")
-}
-
-// Symlink implements billy.Filesystem.
-func (s *S3FS) Symlink(target string, link string) error {
 	panic("unimplemented")
 }
 
