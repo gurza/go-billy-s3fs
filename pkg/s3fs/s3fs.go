@@ -36,29 +36,6 @@ func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
 	}, nil
 }
 
-// Chroot creates a new filesystem rooted at newRoot within the current root.
-func (s *S3FS) Chroot(newRoot string) (billy.Filesystem, error) {
-	cleanRoot := path.Clean(newRoot)
-
-	// Ensure the path is relative
-	if path.IsAbs(cleanRoot) {
-		cleanRoot = cleanRoot[1:]
-	}
-
-	newPath := path.Join(s.root, cleanRoot)
-
-	// Ensure the new root path does not escape the current root
-	base := path.Clean(s.root) + "/"
-	target := path.Clean(newPath) + "/"
-	if !strings.HasPrefix(target, base) {
-		return nil, fmt.Errorf("invalid path: %s escapes from root", newRoot)
-	}
-
-	return &S3FS{
-		root: newPath,
-	}, nil
-}
-
 // Create implements billy.Filesystem.
 func (s *S3FS) Create(filename string) (billy.File, error) {
 	panic("unimplemented")
@@ -78,6 +55,55 @@ func (s *S3FS) Open(filename string) (billy.File, error) {
 // OpenFile implements billy.Filesystem.
 func (s *S3FS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
 	panic("unimplemented")
+}
+
+// Remove implements billy.Filesystem.
+func (s *S3FS) Remove(filename string) error {
+	panic("unimplemented")
+}
+
+// Rename implements billy.Filesystem.
+func (s *S3FS) Rename(oldpath string, newpath string) error {
+	panic("unimplemented")
+}
+
+// Stat retrieves the FileInfo for the named file or directory.
+func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(name),
+	}
+	output, err := s.client.HeadObjectWithContext(ctx, input)
+	if err != nil {
+		return nil, &os.PathError{
+			Op:   "stat",
+			Path: name,
+			Err:  fmt.Errorf("no such file or directory"),
+		}
+	}
+	if _, isSymlink := output.Metadata["Symlink-Target"]; isSymlink {
+		return nil, ErrNotImplemented // symlink handling is not implemented
+	}
+
+	if strings.HasSuffix(name, "/") {
+		return newDirInfo(path.Base(name)), nil
+	}
+	return newFileInfo(path.Base(name), *output.ContentLength, *output.LastModified), nil
+}
+
+// TempFile creates a new temporary file in the directory dir with a name
+// beginning with prefix, opens the file for reading and writing, and
+// returns the resulting *os.File. If dir is the empty string, TempFile
+// uses the default directory for temporary files (see os.TempDir).
+// Multiple programs calling TempFile simultaneously will not choose the
+// same file. The caller can use f.Name() to find the pathname of the file.
+// It is the caller's responsibility to remove the file when no longer
+// needed.
+func (s *S3FS) TempFile(dir string, prefix string) (billy.File, error) {
+	return nil, ErrNotImplemented
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
@@ -183,49 +209,30 @@ func (s *S3FS) Readlink(name string) (string, error) {
 	return "", ErrNotImplemented
 }
 
-// Remove implements billy.Filesystem.
-func (s *S3FS) Remove(filename string) error {
-	panic("unimplemented")
-}
+// Chroot creates a new filesystem rooted at newRoot within the current root.
+func (s *S3FS) Chroot(newRoot string) (billy.Filesystem, error) {
+	cleanRoot := path.Clean(newRoot)
 
-// Rename implements billy.Filesystem.
-func (s *S3FS) Rename(oldpath string, newpath string) error {
-	panic("unimplemented")
+	// Ensure the path is relative
+	if path.IsAbs(cleanRoot) {
+		cleanRoot = cleanRoot[1:]
+	}
+
+	newPath := path.Join(s.root, cleanRoot)
+
+	// Ensure the new root path does not escape the current root
+	base := path.Clean(s.root) + "/"
+	target := path.Clean(newPath) + "/"
+	if !strings.HasPrefix(target, base) {
+		return nil, fmt.Errorf("invalid path: %s escapes from root", newRoot)
+	}
+
+	return &S3FS{
+		root: newPath,
+	}, nil
 }
 
 // Root returns the root path of the filesystem.
 func (s *S3FS) Root() string {
 	return s.root
-}
-
-// Stat retrieves the FileInfo for the named file or directory.
-func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	input := &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(name),
-	}
-	output, err := s.client.HeadObjectWithContext(ctx, input)
-	if err != nil {
-		return nil, &os.PathError{
-			Op:   "stat",
-			Path: name,
-			Err:  fmt.Errorf("no such file or directory"),
-		}
-	}
-	if _, isSymlink := output.Metadata["Symlink-Target"]; isSymlink {
-		return nil, ErrNotImplemented // symlink handling is not implemented
-	}
-
-	if strings.HasSuffix(name, "/") {
-		return newDirInfo(path.Base(name)), nil
-	}
-	return newFileInfo(path.Base(name), *output.ContentLength, *output.LastModified), nil
-}
-
-// TempFile implements billy.Filesystem.
-func (s *S3FS) TempFile(dir string, prefix string) (billy.File, error) {
-	panic("unimplemented")
 }
