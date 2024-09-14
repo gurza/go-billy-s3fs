@@ -147,9 +147,29 @@ func (s *S3FS) MkdirAll(path string, perm fs.FileMode) error {
 	return ErrNotImplemented
 }
 
-// Lstat implements billy.Filesystem.
-func (s *S3FS) Lstat(name string) (fs.FileInfo, error) {
-	panic("unimplemented")
+// Lstat retrieves the FileInfo for the named file or directory
+// without following symbolic links.
+func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(name),
+	}
+	output, err := s.client.HeadObjectWithContext(ctx, input)
+	if err != nil {
+		return nil, &os.PathError{
+			Op:   "lstat",
+			Path: name,
+			Err:  fmt.Errorf("no such file or directory"),
+		}
+	}
+
+	if strings.HasSuffix(name, "/") {
+		return newDirInfo(path.Base(name)), nil
+	}
+	return newFileInfo(path.Base(name), *output.ContentLength, *output.LastModified), nil
 }
 
 // Symlink creates newname as a symbolic link to oldname in the S3 bucket.
@@ -178,9 +198,31 @@ func (s *S3FS) Root() string {
 	return s.root
 }
 
-// Stat implements billy.Filesystem.
-func (s *S3FS) Stat(filename string) (fs.FileInfo, error) {
-	panic("unimplemented")
+// Stat retrieves the FileInfo for the named file or directory.
+func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	input := &s3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(name),
+	}
+	output, err := s.client.HeadObjectWithContext(ctx, input)
+	if err != nil {
+		return nil, &os.PathError{
+			Op:   "stat",
+			Path: name,
+			Err:  fmt.Errorf("no such file or directory"),
+		}
+	}
+	if _, isSymlink := output.Metadata["Symlink-Target"]; isSymlink {
+		return nil, ErrNotImplemented // symlink handling is not implemented
+	}
+
+	if strings.HasSuffix(name, "/") {
+		return newDirInfo(path.Base(name)), nil
+	}
+	return newFileInfo(path.Base(name), *output.ContentLength, *output.LastModified), nil
 }
 
 // TempFile implements billy.Filesystem.
