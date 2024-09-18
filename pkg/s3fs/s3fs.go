@@ -41,20 +41,20 @@ func (s *S3FS) Create(filename string) (billy.File, error) {
 	panic("unimplemented")
 }
 
-// Join combines any number of path elements into a single path,
-// adding a separator if necessary.
-func (s *S3FS) Join(elem ...string) string {
-	return path.Join(elem...)
-}
-
 // Open implements billy.Filesystem.
-func (s *S3FS) Open(filename string) (billy.File, error) {
+func (s *S3FS) Open(name string) (billy.File, error) {
 	panic("unimplemented")
 }
 
 // OpenFile implements billy.Filesystem.
-func (s *S3FS) OpenFile(filename string, flag int, perm fs.FileMode) (billy.File, error) {
+func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
 	panic("unimplemented")
+}
+
+// Join combines any number of path elements into a single path,
+// adding a separator if necessary.
+func (s *S3FS) Join(elem ...string) string {
+	return path.Join(elem...)
 }
 
 // Remove implements billy.Filesystem.
@@ -209,30 +209,37 @@ func (s *S3FS) Readlink(name string) (string, error) {
 	return "", ErrNotImplemented
 }
 
-// Chroot creates a new filesystem rooted at newRoot within the current root.
-func (s *S3FS) Chroot(newRoot string) (billy.Filesystem, error) {
-	cleanRoot := path.Clean(newRoot)
-
-	// Ensure the path is relative
-	if path.IsAbs(cleanRoot) {
-		cleanRoot = cleanRoot[1:]
-	}
-
-	newPath := path.Join(s.root, cleanRoot)
-
-	// Ensure the new root path does not escape the current root
-	base := path.Clean(s.root) + "/"
-	target := path.Clean(newPath) + "/"
-	if !strings.HasPrefix(target, base) {
-		return nil, fmt.Errorf("invalid path: %s escapes from root", newRoot)
+// Chroot scopes the S3FS to a subdirectory and returns a new S3FS instance
+// rooted at the given path.
+func (fs *S3FS) Chroot(subPath string) (billy.Filesystem, error) {
+	resPath, err := fs.underlyingPath(subPath)
+	if err != nil {
+		return nil, err
 	}
 
 	return &S3FS{
-		root: newPath,
+		client: fs.client,
+		bucket: fs.bucket,
+		root:   resPath,
 	}, nil
 }
 
 // Root returns the root path of the filesystem.
 func (s *S3FS) Root() string {
 	return s.root
+}
+
+// underlyingPath ensures the given path is within the allowed boundaries
+// and resolves it relative to the current root.
+func (fs *S3FS) underlyingPath(p string) (string, error) {
+	if isCrossBoundaries(p) {
+		return "", billy.ErrCrossedBoundary
+	}
+	return path.Join(fs.root, path.Clean(p)), nil
+}
+
+// isCrossBoundaries checks if the given S3 path escapes boundaries.
+func isCrossBoundaries(p string) bool {
+	p1 := path.Clean(p)
+	return strings.HasPrefix(p1, "../")
 }
