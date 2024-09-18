@@ -168,9 +168,31 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 }
 
 // MkdirAll creates a directory and all necessary parent directories
-// in the S3 bucket with the specified permissions.
-func (s *S3FS) MkdirAll(path string, perm fs.FileMode) error {
-	return ErrNotImplemented
+// within the S3 bucket. Permissions (perm) are ignored.
+func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
+	resPath, err := s.underlyingPath(name)
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasSuffix(resPath, "/") {
+		// Ensure the path ends with a trailing slash to indicate a "directory"
+		resPath += "/"
+	}
+	_, err = s.client.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(resPath),
+		Body:   aws.ReadSeekCloser(strings.NewReader("")),
+	})
+	if err != nil {
+		return &os.PathError{
+			Op:   "mkdir",
+			Path: name,
+			Err:  fmt.Errorf("failed to create directory in S3 bucket %q: %w", s.bucket, err),
+		}
+	}
+
+	return nil
 }
 
 // Lstat retrieves the FileInfo for the named file or directory
