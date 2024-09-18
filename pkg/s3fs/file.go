@@ -2,7 +2,6 @@ package s3fs
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 
@@ -52,11 +51,7 @@ func (f *file) Write(b []byte) (int, error) {
 
 func (f *file) Truncate(size int64) error {
 	if size < 0 {
-		return &os.PathError{
-			Op:   "truncate",
-			Path: f.name,
-			Err:  errors.New("file size cannot be negative"),
-		}
+		return os.ErrInvalid
 	}
 
 	if size > int64(len(f.content)) {
