@@ -110,12 +110,17 @@ func (s *S3FS) Rename(oldpath string, newpath string) error {
 
 // Stat retrieves the FileInfo for the named file or directory.
 func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
+	resName, err := s.underlyingPath(name)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	input := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(name),
+		Key:    aws.String(resName),
 	}
 	output, err := s.client.HeadObjectWithContext(ctx, input)
 	if err != nil {
@@ -239,12 +244,17 @@ func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
 // Lstat retrieves the FileInfo for the named file or directory
 // without following symbolic links.
 func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
+	resName, err := s.underlyingPath(name)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	input := &s3.HeadObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(name),
+		Key:    aws.String(resName),
 	}
 	output, err := s.client.HeadObjectWithContext(ctx, input)
 	if err != nil {
