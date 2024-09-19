@@ -15,6 +15,8 @@ import (
 	"github.com/go-git/go-billy/v5"
 )
 
+const SupportedOFlags = os.O_RDONLY
+
 type S3FS struct {
 	client *s3.S3
 	bucket string
@@ -49,6 +51,11 @@ func (s *S3FS) Open(name string) (billy.File, error) {
 
 // OpenFile implements billy.Filesystem.
 func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
+	if flag&SupportedOFlags != flag {
+		// todo: support all flags
+		return nil, ErrNotImplemented
+	}
+
 	resName, err := s.underlyingPath(name)
 	if err != nil {
 		return nil, err
