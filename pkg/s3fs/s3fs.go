@@ -3,6 +3,7 @@ package s3fs
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -37,18 +38,58 @@ func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
 }
 
 // Create implements billy.Filesystem.
-func (s *S3FS) Create(filename string) (billy.File, error) {
-	panic("unimplemented")
+func (s *S3FS) Create(name string) (billy.File, error) {
+	return s.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
 // Open implements billy.Filesystem.
 func (s *S3FS) Open(name string) (billy.File, error) {
-	panic("unimplemented")
+	return s.OpenFile(name, os.O_RDONLY, 0)
 }
 
 // OpenFile implements billy.Filesystem.
 func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
-	panic("unimplemented")
+	resName, err := s.underlyingPath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := s.readObject(resName)
+	if err != nil {
+		return nil, &os.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  err,
+		}
+
+	}
+
+	f, err := newFile(name, b)
+	if err != nil {
+		return nil, &os.PathError{
+			Op:   "open",
+			Path: name,
+			Err:  err,
+		}
+	}
+	return f, nil
+}
+
+// readObject retrieves the object content from S3.
+func (s *S3FS) readObject(key string) ([]byte, error) {
+	resp, err := s.client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "NoSuchKey") {
+			return nil, os.ErrNotExist
+		}
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
 }
 
 // Join combines any number of path elements into a single path,
