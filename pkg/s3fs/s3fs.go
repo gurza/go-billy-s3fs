@@ -216,18 +216,18 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 // MkdirAll creates a directory and all necessary parent directories
 // within the S3 bucket. Permissions (perm) are ignored.
 func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
-	resPath, err := s.underlyingPath(name)
+	resName, err := s.underlyingPath(name)
 	if err != nil {
 		return err
 	}
 
-	if !strings.HasSuffix(resPath, "/") {
+	if !strings.HasSuffix(resName, "/") {
 		// Ensure the path ends with a trailing slash to indicate a "directory"
-		resPath += "/"
+		resName += "/"
 	}
 	_, err = s.client.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
-		Key:    aws.String(resPath),
+		Key:    aws.String(resName),
 		Body:   aws.ReadSeekCloser(strings.NewReader("")),
 	})
 	if err != nil {
@@ -285,7 +285,7 @@ func (s *S3FS) Readlink(name string) (string, error) {
 // Chroot scopes the S3FS to a subdirectory and returns a new S3FS instance
 // rooted at the given path.
 func (fs *S3FS) Chroot(subPath string) (billy.Filesystem, error) {
-	resPath, err := fs.underlyingPath(subPath)
+	newRoot, err := fs.underlyingPath(subPath)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (fs *S3FS) Chroot(subPath string) (billy.Filesystem, error) {
 	return &S3FS{
 		client: fs.client,
 		bucket: fs.bucket,
-		root:   resPath,
+		root:   newRoot,
 	}, nil
 }
 
