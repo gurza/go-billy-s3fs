@@ -138,7 +138,7 @@ func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
 		}
 	}
 	if _, isSymlink := output.Metadata["Symlink-Target"]; isSymlink {
-		return nil, ErrNotImplemented // symlink handling is not implemented
+		return nil, fmt.Errorf("%w: symlink handling in Stat()", ErrNotImplemented)
 	}
 
 	if strings.HasSuffix(name, "/") {
