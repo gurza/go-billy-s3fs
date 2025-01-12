@@ -53,7 +53,7 @@ func (s *S3FS) Open(name string) (billy.File, error) {
 func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
 	if flag&SupportedOFlags != flag {
 		// todo: support all flags
-		return nil, ErrNotImplemented
+		return nil, fmt.Errorf("%w: unsupported OpenFile flag %d", ErrNotImplemented, flag)
 	}
 
 	resName, err := s.underlyingPath(name)
