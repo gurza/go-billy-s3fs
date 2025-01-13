@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -50,7 +49,7 @@ func (s *S3FS) Open(name string) (billy.File, error) {
 }
 
 // OpenFile implements billy.Filesystem.
-func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
+func (s *S3FS) OpenFile(name string, flag int, perm os.FileMode) (billy.File, error) {
 	if flag&SupportedOFlags != flag {
 		// todo: support all flags
 		return nil, fmt.Errorf("%w: unsupported OpenFile flag %d", ErrNotImplemented, flag)
@@ -116,7 +115,7 @@ func (s *S3FS) Rename(oldpath string, newpath string) error {
 }
 
 // Stat retrieves the FileInfo for the named file or directory.
-func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
+func (s *S3FS) Stat(name string) (os.FileInfo, error) {
 	resName, err := s.underlyingPath(name)
 	if err != nil {
 		return nil, err
@@ -222,7 +221,7 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 
 // MkdirAll creates a directory and all necessary parent directories
 // within the S3 bucket. Permissions (perm) are ignored.
-func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
+func (s *S3FS) MkdirAll(name string, perm os.FileMode) error {
 	resName, err := s.underlyingPath(name)
 	if err != nil {
 		return err
