@@ -154,8 +154,8 @@ func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
 // same file. The caller can use f.Name() to find the pathname of the file.
 // It is the caller's responsibility to remove the file when no longer
 // needed.
-func (fs *S3FS) TempFile(dir string, prefix string) (billy.File, error) {
-	return nil, fmt.Errorf("%w: TempFile()", ErrNotImplemented)
+func (fs *S3FS) TempFile(dir, prefix string) (billy.File, error) {
+	return nil, fmt.Errorf("%w: TempFile() dir = %q, prefix = %q", ErrNotImplemented, dir, prefix)
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
