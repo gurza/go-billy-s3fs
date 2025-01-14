@@ -167,14 +167,37 @@ func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
 // same file. The caller can use f.Name() to find the pathname of the file.
 // It is the caller's responsibility to remove the file when no longer
 // needed.
-func (fs *S3FS) TempFile(dir, prefix string) (billy.File, error) {
+func (fs *S3FS) TempFile(dir, pattern string) (billy.File, error) {
 	if dir == "" {
 		// TODO: implement fs.TempDir()
 		// dir = fs.TempDir()
-		return nil, fmt.Errorf("%w: TempDir(), prefix = %q", ErrNotImplemented, prefix)
+		return nil, fmt.Errorf("%w: TempDir(), path = %q", ErrNotImplemented, pattern)
 	}
 
-	return nil, ErrNotImplemented
+	prefix, suffix, err := prefixAndSuffix(pattern)
+	if err != nil {
+		return nil, &os.PathError{Op: "tempfile", Path: pattern, Err: err}
+	}
+	prefix, err = fs.abs(joinPath(dir, prefix))
+	if err != nil {
+		return nil, err
+	}
+
+	name := prefix + getRandom() + suffix
+
+	return fs.OpenFile(name, O_RDWR|O_CREATE|O_EXCL, 0600)
+}
+
+func prefixAndSuffix(pattern string) (prefix, suffix string, err error) {
+	return "", "", ErrNotImplemented
+}
+
+func getRandom() string {
+	return ""
+}
+
+func joinPath(dir, name string) string {
+	return ""
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
