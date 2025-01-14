@@ -5,6 +5,8 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // isSubPath checks if targpath is a subpath of basepath.
@@ -70,7 +72,8 @@ func lastIndexByte(s string, c byte) int {
 }
 
 func getRandom() string {
-	return ""
+	uuid := uuid.New().String()
+	return strings.ReplaceAll(uuid, "-", "")
 }
 
 func joinPath(dir, fn string) string {

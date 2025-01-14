@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.38.7
 	github.com/cyphar/filepath-securejoin v0.4.1
 	github.com/go-git/go-billy/v5 v5.6.2
+	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0
 )
 
