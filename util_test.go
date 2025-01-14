@@ -139,7 +139,7 @@ func TestJoinPath(t *testing.T) {
 			want: "/file.txt",
 		},
 		{
-			name: "empty filename",
+			name: "directory with separator and empty filename",
 			dir:  "/home/user/",
 			fn:   "",
 			want: "/home/user/",
