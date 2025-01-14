@@ -188,18 +188,6 @@ func (fs *S3FS) TempFile(dir, pattern string) (billy.File, error) {
 	return fs.OpenFile(name, O_RDWR|O_CREATE|O_EXCL, 0600)
 }
 
-func prefixAndSuffix(pattern string) (prefix, suffix string, err error) {
-	return "", "", ErrNotImplemented
-}
-
-func getRandom() string {
-	return ""
-}
-
-func joinPath(dir, name string) string {
-	return ""
-}
-
 // ReadDir lists the contents of a directory in the S3 bucket,
 // returning file and directory information.
 func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {

@@ -41,3 +41,15 @@ func isSubPath(basepath, targpath string) bool {
 
 	return true
 }
+
+func prefixAndSuffix(pattern string) (prefix, suffix string, err error) {
+	return "", "", ErrNotImplemented
+}
+
+func getRandom() string {
+	return ""
+}
+
+func joinPath(dir, name string) string {
+	return ""
+}
