@@ -15,7 +15,10 @@ import (
 	"github.com/go-git/go-billy/v5"
 )
 
-const SupportedOFlags = os.O_RDONLY
+const (
+	PathSeparator   = '/' // OS-specific path separator
+	SupportedOFlags = os.O_RDONLY
+)
 
 type S3FS struct {
 	client *s3.S3

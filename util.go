@@ -1,6 +1,7 @@
 package s3fs
 
 import (
+	"errors"
 	"path"
 	"path/filepath"
 	"strings"
@@ -43,7 +44,27 @@ func isSubPath(basepath, targpath string) bool {
 }
 
 func prefixAndSuffix(pattern string) (prefix, suffix string, err error) {
-	return "", "", ErrNotImplemented
+	// FIXME: use range after with golang122
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] == PathSeparator {
+			return "", "", errors.New("pattern contains path separator")
+		}
+	}
+	if pos := lastIndexByte(pattern, '*'); pos != -1 {
+		prefix, suffix = pattern[:pos], pattern[pos+1:]
+	} else {
+		prefix = pattern
+	}
+	return prefix, suffix, nil
+}
+
+func lastIndexByte(s string, c byte) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
 }
 
 func getRandom() string {
