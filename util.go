@@ -73,6 +73,9 @@ func getRandom() string {
 	return ""
 }
 
-func joinPath(dir, name string) string {
-	return ""
+func joinPath(dir, fn string) string {
+	if len(dir) > 0 && dir[len(dir)-1] == PathSeparator {
+		return dir + fn
+	}
+	return dir + string(PathSeparator) + fn
 }
