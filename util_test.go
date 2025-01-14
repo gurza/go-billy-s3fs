@@ -48,6 +48,51 @@ func TestIsSubPath(t *testing.T) {
 	}
 }
 
+func TestPrefixAndSuffix(t *testing.T) {
+	// no wildcard
+	prefix, suffix, err := prefixAndSuffix("abc")
+	assert.NoError(t, err)
+	assert.Equal(t, "abc", prefix)
+	assert.Equal(t, "", suffix)
+
+	// wildcard at the beginning
+	prefix, suffix, err = prefixAndSuffix("*def")
+	assert.NoError(t, err)
+	assert.Equal(t, "", prefix)
+	assert.Equal(t, "def", suffix)
+
+	// wildcard at the end
+	prefix, suffix, err = prefixAndSuffix("abc*")
+	assert.NoError(t, err)
+	assert.Equal(t, "abc", prefix)
+	assert.Equal(t, "", suffix)
+
+	// wildcard in the middle
+	prefix, suffix, err = prefixAndSuffix("abc*def")
+	assert.NoError(t, err)
+	assert.Equal(t, "abc", prefix)
+	assert.Equal(t, "def", suffix)
+
+	// multiple wildcards (should split by the last one)
+	prefix, suffix, err = prefixAndSuffix("abc*def*ghi")
+	assert.NoError(t, err)
+	assert.Equal(t, "abc*def", prefix)
+	assert.Equal(t, "ghi", suffix)
+
+	// path separator (should return error)
+	prefix, suffix, err = prefixAndSuffix("abc/def")
+	assert.Error(t, err)
+	assert.Equal(t, "", prefix)
+	assert.Equal(t, "", suffix)
+	assert.Equal(t, "pattern contains path separator", err.Error())
+
+	// empty string
+	prefix, suffix, err = prefixAndSuffix("")
+	assert.NoError(t, err)
+	assert.Equal(t, "", prefix)
+	assert.Equal(t, "", suffix)
+}
+
 func TestLastIndexByte(t *testing.T) {
 	// byte is found at the beginning
 	assert.Equal(t, 0, lastIndexByte("abcdef", 'a'))
