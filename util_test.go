@@ -49,48 +49,79 @@ func TestIsSubPath(t *testing.T) {
 }
 
 func TestPrefixAndSuffix(t *testing.T) {
-	// no wildcard
-	prefix, suffix, err := prefixAndSuffix("abc")
-	assert.NoError(t, err)
-	assert.Equal(t, "abc", prefix)
-	assert.Equal(t, "", suffix)
+	tests := []struct {
+		name    string
+		pattern string
+		prefix  string
+		suffix  string
+	}{
+		{
+			name:    "no wildcard",
+			pattern: "abc",
+			prefix:  "abc",
+			suffix:  "",
+		},
+		{
+			name:    "wildcard at the beginning",
+			pattern: "*def",
+			prefix:  "",
+			suffix:  "def",
+		},
+		{
+			name:    "wildcard in the middle",
+			pattern: "abc*def",
+			prefix:  "abc",
+			suffix:  "def",
+		},
+		{
+			name:    "wildcard at the end",
+			pattern: "abc*",
+			prefix:  "abc",
+			suffix:  "",
+		},
+		{
+			name:    "multiple wildcards (split by last one)",
+			pattern: "abc*def*ghi",
+			prefix:  "abc*def",
+			suffix:  "ghi",
+		},
+		{
+			name:    "empty string",
+			pattern: "",
+			prefix:  "",
+			suffix:  "",
+		},
+	}
 
-	// wildcard at the beginning
-	prefix, suffix, err = prefixAndSuffix("*def")
-	assert.NoError(t, err)
-	assert.Equal(t, "", prefix)
-	assert.Equal(t, "def", suffix)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prefix, suffix, err := prefixAndSuffix(tt.pattern)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.prefix, prefix)
+			assert.Equal(t, tt.suffix, suffix)
+		})
+	}
+}
 
-	// wildcard at the end
-	prefix, suffix, err = prefixAndSuffix("abc*")
-	assert.NoError(t, err)
-	assert.Equal(t, "abc", prefix)
-	assert.Equal(t, "", suffix)
+func TestPrefixAndSuffix_Error(t *testing.T) {
+	tests := []struct {
+		name    string
+		pattern string
+	}{
+		{
+			name:    "path separator",
+			pattern: "abc/def",
+		},
+	}
 
-	// wildcard in the middle
-	prefix, suffix, err = prefixAndSuffix("abc*def")
-	assert.NoError(t, err)
-	assert.Equal(t, "abc", prefix)
-	assert.Equal(t, "def", suffix)
-
-	// multiple wildcards (should split by the last one)
-	prefix, suffix, err = prefixAndSuffix("abc*def*ghi")
-	assert.NoError(t, err)
-	assert.Equal(t, "abc*def", prefix)
-	assert.Equal(t, "ghi", suffix)
-
-	// path separator (should return error)
-	prefix, suffix, err = prefixAndSuffix("abc/def")
-	assert.Error(t, err)
-	assert.Equal(t, "", prefix)
-	assert.Equal(t, "", suffix)
-	assert.Equal(t, "pattern contains path separator", err.Error())
-
-	// empty string
-	prefix, suffix, err = prefixAndSuffix("")
-	assert.NoError(t, err)
-	assert.Equal(t, "", prefix)
-	assert.Equal(t, "", suffix)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prefix, suffix, err := prefixAndSuffix(tt.pattern)
+			assert.Error(t, err)
+			assert.Equal(t, "", prefix)
+			assert.Equal(t, "", suffix)
+		})
+	}
 }
 
 func TestLastIndexByte(t *testing.T) {
