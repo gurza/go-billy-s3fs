@@ -112,3 +112,62 @@ func TestLastIndexByte(t *testing.T) {
 	// empty string
 	assert.Equal(t, -1, lastIndexByte("", 'a'))
 }
+
+func TestJoinPath(t *testing.T) {
+	tests := []struct {
+		name string
+		dir  string
+		fn   string
+		want string
+	}{
+		{
+			name: "directory with separator",
+			dir:  "/home/user/",
+			fn:   "file.txt",
+			want: "/home/user/file.txt",
+		},
+		{
+			name: "directory without separator",
+			dir:  "/home/user",
+			fn:   "file.txt",
+			want: "/home/user/file.txt",
+		},
+		{
+			name: "empty directory",
+			dir:  "",
+			fn:   "file.txt",
+			want: "/file.txt",
+		},
+		{
+			name: "empty filename",
+			dir:  "/home/user/",
+			fn:   "",
+			want: "/home/user/",
+		},
+		{
+			name: "directory without separator and empty filename",
+			dir:  "/home/user",
+			fn:   "",
+			want: "/home/user/",
+		},
+		{
+			name: "empty directory and filename",
+			dir:  "",
+			fn:   "",
+			want: "/",
+		},
+		{
+			name: "relative path",
+			dir:  "user/docs",
+			fn:   "file.txt",
+			want: "user/docs/file.txt",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := joinPath(tc.dir, tc.fn)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
