@@ -168,7 +168,13 @@ func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
 // It is the caller's responsibility to remove the file when no longer
 // needed.
 func (fs *S3FS) TempFile(dir, prefix string) (billy.File, error) {
-	return nil, fmt.Errorf("%w: TempFile() dir = %q, prefix = %q", ErrNotImplemented, dir, prefix)
+	if dir == "" {
+		// TODO: implement fs.TempDir()
+		// dir = fs.TempDir()
+		return nil, fmt.Errorf("%w: TempDir(), prefix = %q", ErrNotImplemented, prefix)
+	}
+
+	return nil, ErrNotImplemented
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
