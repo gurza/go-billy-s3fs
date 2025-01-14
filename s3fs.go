@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/go-git/go-billy/v5"
 )
 
@@ -36,6 +37,18 @@ func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
 		bucket: bucket,
 		root:   "/",
 	}, nil
+}
+
+// abs converts a filename to an absolute path relative to fs.root,
+// ensuring it doesn't escape the root directory.
+//
+// Symlinks are attempted to be resolved to their target paths. The resolution
+// depends on the implementation of the `Lstat` and `Readlink` methods.
+// For example, if fs.root is "/base" and fn is "lnk1/lnk2/file.go",
+// where "lnk1" is a symlink to "/tgt1" and "lnk2" is a symlink to "/tgt2",
+// the result will be "/base/tgt1/tgt2/file".
+func (fs *S3FS) abs(fn string) (string, error) {
+	return securejoin.SecureJoinVFS(fs.root, fn, fs)
 }
 
 // Create implements billy.Filesystem.
