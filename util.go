@@ -43,6 +43,8 @@ func isSubPath(basepath, targpath string) bool {
 	return true
 }
 
+// prefixAndSuffix splits pattern by the last wildcard "*", if applicable,
+// returning prefix as the part before "*" and suffix as the part after "*".
 func prefixAndSuffix(pattern string) (prefix, suffix string, err error) {
 	// FIXME: use range after with golang122
 	for i := 0; i < len(pattern); i++ {
