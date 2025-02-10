@@ -71,28 +71,19 @@ func (fs *S3FS) OpenFile(name string, flag int, perm os.FileMode) (billy.File, e
 		return nil, fmt.Errorf("%w: unsupported OpenFile flag %d", ErrNotImplemented, flag)
 	}
 
-	resName, err := fs.underlyingPath(name)
+	absPath, err := fs.abs(name)
 	if err != nil {
-		return nil, err
+		return nil, &os.PathError{Op: "openfile", Path: name, Err: err}
 	}
 
-	b, err := fs.readObject(resName)
+	b, err := fs.readObject(absPath)
 	if err != nil {
-		return nil, &os.PathError{
-			Op:   "open",
-			Path: name,
-			Err:  err,
-		}
-
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 
 	f, err := newFile(name, b)
 	if err != nil {
-		return nil, &os.PathError{
-			Op:   "open",
-			Path: name,
-			Err:  err,
-		}
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 	return f, nil
 }
@@ -181,10 +172,7 @@ func (fs *S3FS) TempFile(dir, pattern string) (billy.File, error) {
 	if err != nil {
 		return nil, &os.PathError{Op: "tempfile", Path: pattern, Err: err}
 	}
-	prefix, err = fs.abs(joinPath(dir, prefix))
-	if err != nil {
-		return nil, err
-	}
+	prefix = joinPath(dir, prefix)
 
 	name := prefix + getRandom() + suffix
 
@@ -344,6 +332,7 @@ func (fs *S3FS) Root() string {
 // underlyingPath ensures the given path is within the allowed boundaries
 // and resolves it relative to the current root.
 func (fs *S3FS) underlyingPath(p string) (string, error) {
+	// TODO: use abs() instead of underlyingPath()
 	if isCrossBoundaries(p) {
 		return "", billy.ErrCrossedBoundary
 	}
