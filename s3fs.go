@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/go-git/go-billy/v5"
 )
@@ -21,7 +21,7 @@ const (
 )
 
 type S3FS struct {
-	client *s3.S3
+	client *s3.Client
 	bucket string
 	root   string
 }
