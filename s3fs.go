@@ -285,7 +285,7 @@ func (fs *S3FS) Lstat(name string) (os.FileInfo, error) {
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := fs.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObject(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "lstat",
