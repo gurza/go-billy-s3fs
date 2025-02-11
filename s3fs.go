@@ -213,16 +213,21 @@ func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	}
 
 	var results []os.FileInfo
-	err := fs.client.ListObjectsV2PagesWithContext(ctx, input, func(page *s3.ListObjectsV2Output, last bool) bool {
+	paginator := s3.NewListObjectsV2Paginator(fs.client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list objects: %w", err)
+		}
 		for _, prefix := range page.CommonPrefixes {
-			dirName := strings.TrimPrefix(*prefix.Prefix, s3Path)
+			dirName := strings.TrimPrefix(aws.ToString(prefix.Prefix), *input.Prefix)
 			dirName = strings.TrimSuffix(dirName, "/")
 			if dirName != "" && dirName != "/" {
 				results = append(results, newDirInfo(dirName))
 			}
 		}
 		for _, obj := range page.Contents {
-			fileName := strings.TrimPrefix(*obj.Key, s3Path)
+			fileName := strings.TrimPrefix(aws.ToString(obj.Key), *input.Prefix)
 			if fileName != "" && !strings.HasSuffix(fileName, "/") {
 				results = append(results, newFileInfo(
 					fileName,
@@ -231,10 +236,6 @@ func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 				))
 			}
 		}
-		return !last
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects: %w", err)
 	}
 
 	return results, nil
