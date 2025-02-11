@@ -90,7 +90,7 @@ func (fs *S3FS) OpenFile(name string, flag int, perm os.FileMode) (billy.File, e
 
 // readObject retrieves the object content from S3.
 func (fs *S3FS) readObject(key string) ([]byte, error) {
-	resp, err := fs.client.GetObject(&s3.GetObjectInput{
+	resp, err := fs.client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(key),
 	})
@@ -135,7 +135,7 @@ func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := fs.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObject(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "stat",
