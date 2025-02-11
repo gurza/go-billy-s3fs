@@ -253,10 +253,11 @@ func (fs *S3FS) MkdirAll(name string, perm os.FileMode) error {
 		// Ensure the path ends with a trailing slash to indicate a "directory"
 		resName += "/"
 	}
-	_, err = fs.client.PutObject(&s3.PutObjectInput{
+	body := strings.NewReader("")
+	_, err = fs.client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
-		Body:   aws.ReadSeekCloser(strings.NewReader("")),
+		Body:   body,
 	})
 	if err != nil {
 		return &os.PathError{
