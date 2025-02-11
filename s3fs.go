@@ -27,7 +27,7 @@ type S3FS struct {
 }
 
 // NewS3FS creates a new S3-backed filesystem for the given bucket.
-func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
+func New(client *s3.Client, bucket string) (billy.Filesystem, error) {
 	if client == nil {
 		return nil, fmt.Errorf("s3 client cannot be nil")
 	}
