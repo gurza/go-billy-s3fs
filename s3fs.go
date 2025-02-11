@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	PathSeparator   = '/' // OS-specific path separator
+	PathSeparator   = '/'
 	SupportedOFlags = os.O_RDONLY
 )
 
