@@ -1,19 +1,18 @@
 package s3fs
 
 import (
-	"io/fs"
+	"os"
 	"reflect"
 	"testing"
 )
 
-func TestFileInfo_ImplementsFSFileInfo(t *testing.T) {
-	var fi fileInfo
+func TestFileStat_ImplementsOSFileInfo(t *testing.T) {
+	var fs fileStat
 
-	iface := reflect.TypeOf((*fs.FileInfo)(nil)).Elem()
-	sType := reflect.TypeOf(&fi)
+	iface := reflect.TypeOf((*os.FileInfo)(nil)).Elem()
+	sType := reflect.TypeOf(&fs)
 
-	// Check if *fileInfo implements fs.FileInfo
 	if !sType.Implements(iface) {
-		t.Errorf("fileInfo does not implement fs.FileInfo interface")
+		t.Errorf("fileStat does not implement os.FileInfo interface")
 	}
 }
