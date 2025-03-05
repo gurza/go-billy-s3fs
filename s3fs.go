@@ -53,7 +53,7 @@ func (s *S3FS) Open(name string) (billy.File, error) {
 func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
 	if flag&SupportedOFlags != flag {
 		// todo: support all flags
-		return nil, ErrNotImplemented
+		return nil, fmt.Errorf("%w: unsupported OpenFile flag %d", ErrNotImplemented, flag)
 	}
 
 	resName, err := s.underlyingPath(name)
@@ -138,7 +138,7 @@ func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
 		}
 	}
 	if _, isSymlink := output.Metadata["Symlink-Target"]; isSymlink {
-		return nil, ErrNotImplemented // symlink handling is not implemented
+		return nil, fmt.Errorf("%w: symlink handling in Stat()", ErrNotImplemented)
 	}
 
 	if strings.HasSuffix(name, "/") {
@@ -156,7 +156,7 @@ func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
 // It is the caller's responsibility to remove the file when no longer
 // needed.
 func (s *S3FS) TempFile(dir string, prefix string) (billy.File, error) {
-	return nil, ErrNotImplemented
+	return nil, fmt.Errorf("%w: TempFile()", ErrNotImplemented)
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
@@ -280,13 +280,13 @@ func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
 
 // Symlink creates newname as a symbolic link to oldname in the S3 bucket.
 func (s *S3FS) Symlink(oldname string, newname string) error {
-	return ErrNotImplemented
+	return fmt.Errorf("%w: Symlink()", ErrNotImplemented)
 }
 
 // Readlink returns the destination of the named symbolic link
 // in the S3 bucket.
 func (s *S3FS) Readlink(name string) (string, error) {
-	return "", ErrNotImplemented
+	return "", fmt.Errorf("%w: Readlink()", ErrNotImplemented)
 }
 
 // Chroot scopes the S3FS to a subdirectory and returns a new S3FS instance
