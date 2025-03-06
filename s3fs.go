@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -12,10 +11,14 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
+	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/go-git/go-billy/v5"
 )
 
-const SupportedOFlags = os.O_RDONLY
+const (
+	PathSeparator   = '/' // OS-specific path separator
+	SupportedOFlags = os.O_RDONLY
+)
 
 type S3FS struct {
 	client *s3.S3
@@ -39,53 +42,56 @@ func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
 	}, nil
 }
 
+// abs converts a filename to an absolute path relative to fs.root,
+// ensuring it doesn't escape the root directory.
+//
+// Symlinks are attempted to be resolved to their target paths. The resolution
+// depends on the implementation of the `Lstat` and `Readlink` methods.
+// For example, if fs.root is "/base" and fn is "lnk1/lnk2/file.go",
+// where "lnk1" is a symlink to "/tgt1" and "lnk2" is a symlink to "/tgt2",
+// the result will be "/base/tgt1/tgt2/file".
+func (fs *S3FS) abs(fn string) (string, error) {
+	return securejoin.SecureJoinVFS(fs.root, fn, fs)
+}
+
 // Create implements billy.Filesystem.
-func (s *S3FS) Create(name string) (billy.File, error) {
-	return s.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+func (fs *S3FS) Create(name string) (billy.File, error) {
+	return fs.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 }
 
 // Open implements billy.Filesystem.
-func (s *S3FS) Open(name string) (billy.File, error) {
-	return s.OpenFile(name, os.O_RDONLY, 0)
+func (fs *S3FS) Open(name string) (billy.File, error) {
+	return fs.OpenFile(name, os.O_RDONLY, 0)
 }
 
 // OpenFile implements billy.Filesystem.
-func (s *S3FS) OpenFile(name string, flag int, perm fs.FileMode) (billy.File, error) {
+func (fs *S3FS) OpenFile(name string, flag int, perm os.FileMode) (billy.File, error) {
 	if flag&SupportedOFlags != flag {
 		// todo: support all flags
 		return nil, fmt.Errorf("%w: unsupported OpenFile flag %d", ErrNotImplemented, flag)
 	}
 
-	resName, err := s.underlyingPath(name)
+	absPath, err := fs.abs(name)
 	if err != nil {
-		return nil, err
+		return nil, &os.PathError{Op: "openfile", Path: name, Err: err}
 	}
 
-	b, err := s.readObject(resName)
+	b, err := fs.readObject(absPath)
 	if err != nil {
-		return nil, &os.PathError{
-			Op:   "open",
-			Path: name,
-			Err:  err,
-		}
-
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 
 	f, err := newFile(name, b)
 	if err != nil {
-		return nil, &os.PathError{
-			Op:   "open",
-			Path: name,
-			Err:  err,
-		}
+		return nil, &os.PathError{Op: "open", Path: name, Err: err}
 	}
 	return f, nil
 }
 
 // readObject retrieves the object content from S3.
-func (s *S3FS) readObject(key string) ([]byte, error) {
-	resp, err := s.client.GetObject(&s3.GetObjectInput{
-		Bucket: aws.String(s.bucket),
+func (fs *S3FS) readObject(key string) ([]byte, error) {
+	resp, err := fs.client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(key),
 	})
 	if err != nil {
@@ -101,23 +107,23 @@ func (s *S3FS) readObject(key string) ([]byte, error) {
 
 // Join combines any number of path elements into a single path,
 // adding a separator if necessary.
-func (s *S3FS) Join(elem ...string) string {
+func (fs *S3FS) Join(elem ...string) string {
 	return path.Join(elem...)
 }
 
 // Remove implements billy.Filesystem.
-func (s *S3FS) Remove(filename string) error {
+func (fs *S3FS) Remove(filename string) error {
 	panic("unimplemented")
 }
 
 // Rename implements billy.Filesystem.
-func (s *S3FS) Rename(oldpath string, newpath string) error {
+func (fs *S3FS) Rename(oldpath string, newpath string) error {
 	panic("unimplemented")
 }
 
 // Stat retrieves the FileInfo for the named file or directory.
-func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
-	resName, err := s.underlyingPath(name)
+func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
+	resName, err := fs.underlyingPath(name)
 	if err != nil {
 		return nil, err
 	}
@@ -126,10 +132,10 @@ func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
 	defer cancel()
 
 	input := &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
+		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := s.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObjectWithContext(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "stat",
@@ -155,28 +161,42 @@ func (s *S3FS) Stat(name string) (fs.FileInfo, error) {
 // same file. The caller can use f.Name() to find the pathname of the file.
 // It is the caller's responsibility to remove the file when no longer
 // needed.
-func (s *S3FS) TempFile(dir string, prefix string) (billy.File, error) {
-	return nil, fmt.Errorf("%w: TempFile()", ErrNotImplemented)
+func (fs *S3FS) TempFile(dir, pattern string) (billy.File, error) {
+	if dir == "" {
+		// TODO: implement fs.TempDir()
+		// dir = fs.TempDir()
+		return nil, fmt.Errorf("%w: TempDir(), path = %q", ErrNotImplemented, pattern)
+	}
+
+	prefix, suffix, err := prefixAndSuffix(pattern)
+	if err != nil {
+		return nil, &os.PathError{Op: "tempfile", Path: pattern, Err: err}
+	}
+	prefix = joinPath(dir, prefix)
+
+	name := prefix + getRandom() + suffix
+
+	return fs.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 }
 
 // ReadDir lists the contents of a directory in the S3 bucket,
 // returning file and directory information.
-func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
+func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	cleanName := path.Clean(name)
 	if path.IsAbs(cleanName) {
 		cleanName = cleanName[1:]
 	}
 
 	// Combine with the root path and normalize
-	s3Path := path.Join(s.root, cleanName)
+	s3Path := path.Join(fs.root, cleanName)
 	s3Path = strings.TrimLeft(s3Path, "/")
 	if s3Path != "" && !strings.HasSuffix(s3Path, "/") {
 		s3Path += "/"
 	}
 
 	// Ensure the path doesn't escape the root
-	base := path.Clean(strings.TrimLeft(s.root, "/"))
-	target := path.Clean(strings.TrimLeft(path.Join(s.root, cleanName), "/"))
+	base := path.Clean(strings.TrimLeft(fs.root, "/"))
+	target := path.Clean(strings.TrimLeft(path.Join(fs.root, cleanName), "/"))
 	if !isSubPath(base, target) {
 		return nil, fmt.Errorf("invalid path: %s escapes from root", name)
 	}
@@ -185,7 +205,7 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	defer cancel()
 
 	input := &s3.ListObjectsV2Input{
-		Bucket:    aws.String(s.bucket),
+		Bucket:    aws.String(fs.bucket),
 		Delimiter: aws.String("/"),
 	}
 	if s3Path != "" && s3Path != "/" {
@@ -193,7 +213,7 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	}
 
 	var results []os.FileInfo
-	err := s.client.ListObjectsV2PagesWithContext(ctx, input, func(page *s3.ListObjectsV2Output, last bool) bool {
+	err := fs.client.ListObjectsV2PagesWithContext(ctx, input, func(page *s3.ListObjectsV2Output, last bool) bool {
 		for _, prefix := range page.CommonPrefixes {
 			dirName := strings.TrimPrefix(*prefix.Prefix, s3Path)
 			dirName = strings.TrimSuffix(dirName, "/")
@@ -222,8 +242,8 @@ func (s *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 
 // MkdirAll creates a directory and all necessary parent directories
 // within the S3 bucket. Permissions (perm) are ignored.
-func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
-	resName, err := s.underlyingPath(name)
+func (fs *S3FS) MkdirAll(name string, perm os.FileMode) error {
+	resName, err := fs.underlyingPath(name)
 	if err != nil {
 		return err
 	}
@@ -232,8 +252,8 @@ func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
 		// Ensure the path ends with a trailing slash to indicate a "directory"
 		resName += "/"
 	}
-	_, err = s.client.PutObject(&s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
+	_, err = fs.client.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 		Body:   aws.ReadSeekCloser(strings.NewReader("")),
 	})
@@ -241,7 +261,7 @@ func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
 		return &os.PathError{
 			Op:   "mkdir",
 			Path: name,
-			Err:  fmt.Errorf("failed to create directory in S3 bucket %q: %w", s.bucket, err),
+			Err:  fmt.Errorf("failed to create directory in S3 bucket %q: %w", fs.bucket, err),
 		}
 	}
 
@@ -250,8 +270,8 @@ func (s *S3FS) MkdirAll(name string, perm fs.FileMode) error {
 
 // Lstat retrieves the FileInfo for the named file or directory
 // without following symbolic links.
-func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
-	resName, err := s.underlyingPath(name)
+func (fs *S3FS) Lstat(name string) (os.FileInfo, error) {
+	resName, err := fs.underlyingPath(name)
 	if err != nil {
 		return nil, err
 	}
@@ -260,10 +280,10 @@ func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
 	defer cancel()
 
 	input := &s3.HeadObjectInput{
-		Bucket: aws.String(s.bucket),
+		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := s.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObjectWithContext(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "lstat",
@@ -279,13 +299,13 @@ func (s *S3FS) Lstat(name string) (os.FileInfo, error) {
 }
 
 // Symlink creates newname as a symbolic link to oldname in the S3 bucket.
-func (s *S3FS) Symlink(oldname string, newname string) error {
+func (fs *S3FS) Symlink(oldname string, newname string) error {
 	return fmt.Errorf("%w: Symlink()", ErrNotImplemented)
 }
 
 // Readlink returns the destination of the named symbolic link
 // in the S3 bucket.
-func (s *S3FS) Readlink(name string) (string, error) {
+func (fs *S3FS) Readlink(name string) (string, error) {
 	return "", fmt.Errorf("%w: Readlink()", ErrNotImplemented)
 }
 
@@ -305,13 +325,14 @@ func (fs *S3FS) Chroot(subPath string) (billy.Filesystem, error) {
 }
 
 // Root returns the root path of the filesystem.
-func (s *S3FS) Root() string {
-	return s.root
+func (fs *S3FS) Root() string {
+	return fs.root
 }
 
 // underlyingPath ensures the given path is within the allowed boundaries
 // and resolves it relative to the current root.
 func (fs *S3FS) underlyingPath(p string) (string, error) {
+	// TODO: use abs() instead of underlyingPath()
 	if isCrossBoundaries(p) {
 		return "", billy.ErrCrossedBoundary
 	}
