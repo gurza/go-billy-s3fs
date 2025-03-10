@@ -9,25 +9,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/go-git/go-billy/v5"
 )
 
 const (
-	PathSeparator   = '/' // OS-specific path separator
+	PathSeparator   = '/'
 	SupportedOFlags = os.O_RDONLY
 )
 
 type S3FS struct {
-	client *s3.S3
+	client *s3.Client
 	bucket string
 	root   string
 }
 
 // NewS3FS creates a new S3-backed filesystem for the given bucket.
-func New(client *s3.S3, bucket string) (billy.Filesystem, error) {
+func New(client *s3.Client, bucket string) (billy.Filesystem, error) {
 	if client == nil {
 		return nil, fmt.Errorf("s3 client cannot be nil")
 	}
@@ -90,7 +90,7 @@ func (fs *S3FS) OpenFile(name string, flag int, perm os.FileMode) (billy.File, e
 
 // readObject retrieves the object content from S3.
 func (fs *S3FS) readObject(key string) ([]byte, error) {
-	resp, err := fs.client.GetObject(&s3.GetObjectInput{
+	resp, err := fs.client.GetObject(context.TODO(), &s3.GetObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(key),
 	})
@@ -135,7 +135,7 @@ func (fs *S3FS) Stat(name string) (os.FileInfo, error) {
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := fs.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObject(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "stat",
@@ -213,16 +213,21 @@ func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 	}
 
 	var results []os.FileInfo
-	err := fs.client.ListObjectsV2PagesWithContext(ctx, input, func(page *s3.ListObjectsV2Output, last bool) bool {
+	paginator := s3.NewListObjectsV2Paginator(fs.client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list objects: %w", err)
+		}
 		for _, prefix := range page.CommonPrefixes {
-			dirName := strings.TrimPrefix(*prefix.Prefix, s3Path)
+			dirName := strings.TrimPrefix(aws.ToString(prefix.Prefix), *input.Prefix)
 			dirName = strings.TrimSuffix(dirName, "/")
 			if dirName != "" && dirName != "/" {
 				results = append(results, newDirInfo(dirName))
 			}
 		}
 		for _, obj := range page.Contents {
-			fileName := strings.TrimPrefix(*obj.Key, s3Path)
+			fileName := strings.TrimPrefix(aws.ToString(obj.Key), *input.Prefix)
 			if fileName != "" && !strings.HasSuffix(fileName, "/") {
 				results = append(results, newFileInfo(
 					fileName,
@@ -231,10 +236,6 @@ func (fs *S3FS) ReadDir(name string) ([]os.FileInfo, error) {
 				))
 			}
 		}
-		return !last
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list objects: %w", err)
 	}
 
 	return results, nil
@@ -252,10 +253,11 @@ func (fs *S3FS) MkdirAll(name string, perm os.FileMode) error {
 		// Ensure the path ends with a trailing slash to indicate a "directory"
 		resName += "/"
 	}
-	_, err = fs.client.PutObject(&s3.PutObjectInput{
+	body := strings.NewReader("")
+	_, err = fs.client.PutObject(context.TODO(), &s3.PutObjectInput{
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
-		Body:   aws.ReadSeekCloser(strings.NewReader("")),
+		Body:   body,
 	})
 	if err != nil {
 		return &os.PathError{
@@ -283,7 +285,7 @@ func (fs *S3FS) Lstat(name string) (os.FileInfo, error) {
 		Bucket: aws.String(fs.bucket),
 		Key:    aws.String(resName),
 	}
-	output, err := fs.client.HeadObjectWithContext(ctx, input)
+	output, err := fs.client.HeadObject(ctx, input)
 	if err != nil {
 		return nil, &os.PathError{
 			Op:   "lstat",
